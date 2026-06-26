@@ -1,0 +1,50 @@
+name: Agent Build & Test
+
+on:
+  push:
+    branches: [main, agent/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    runs-on: self-hosted  # Your Linux VPS with UE5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      
+      - name: Setup UE5
+        run: |
+          # Your UE5 path
+          export UE5_PATH=/opt/UnrealEngine/Engine
+      
+      - name: Compile Project
+        run: |
+          $UE5_PATH/Build/BatchFiles/Linux/Build.sh \
+            Ma3Editor Linux Development \
+            -project="$PWD/ma3.uproject"
+      
+      - name: Cook Project
+        run: |
+          $UE5_PATH/Build/BatchFiles/RunUAT.sh BuildCookRun \
+            -project="$PWD/ma3.uproject" \
+            -platform=Linux -clientconfig=Development \
+            -cook -stage -pak
+      
+      - name: Run Automated Tests
+        run: |
+          # Launch PIE headless, run test suite
+          python ma3-harness/agent-runtime/run_tests.py \
+            --build-path ./Build/Linux \
+            --duration 1800
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ github.sha }}
+          path: |
+            Build/Linux/
+            TestResults/
+            Screenshots/
+            
